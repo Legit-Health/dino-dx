@@ -24,6 +24,7 @@ from torchvision import transforms as pth_transforms
 from torchvision import models as torchvision_models
 
 import utils
+from dx_utils import DXDataset4DINO
 import vision_transformer as vits
 
 
@@ -35,8 +36,12 @@ def extract_feature_pipeline(args):
         pth_transforms.ToTensor(),
         pth_transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225)),
     ])
-    dataset_train = ReturnIndexDataset(os.path.join(args.data_path, "train"), transform=transform)
-    dataset_val = ReturnIndexDataset(os.path.join(args.data_path, "val"), transform=transform)
+
+    dataset_train = ReturnIndexDXDataset(args.csv_path, args.data_path, transform=transform, split="train")
+    dataset_val = ReturnIndexDXDataset(args.csv_path, args.data_path, transform=transform, split="val")
+
+    # dataset_train = ReturnIndexDataset(os.path.join(args.data_path, "train"), transform=transform)
+    # dataset_val = ReturnIndexDataset(os.path.join(args.data_path, "val"), transform=transform)
     sampler = torch.utils.data.DistributedSampler(dataset_train, shuffle=False)
     data_loader_train = torch.utils.data.DataLoader(
         dataset_train,
@@ -188,6 +193,12 @@ class ReturnIndexDataset(datasets.ImageFolder):
         return img, idx
 
 
+class ReturnIndexDXDataset(DXDataset4DINO):
+    def __getitem__(self, idx):
+        img, lab = super(ReturnIndexDXDataset, self).__getitem__(idx)
+        return img, idx
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser('Evaluation with weighted k-NN on ImageNet')
     parser.add_argument('--batch_size_per_gpu', default=128, type=int, help='Per-GPU batch-size')
@@ -210,7 +221,10 @@ if __name__ == '__main__':
     parser.add_argument("--dist_url", default="env://", type=str, help="""url used to set up
         distributed training; see https://pytorch.org/docs/stable/distributed.html""")
     parser.add_argument("--local_rank", default=0, type=int, help="Please ignore and do not set this argument.")
-    parser.add_argument('--data_path', default='/path/to/imagenet/', type=str)
+    parser.add_argument('--data_path', default='/path/to/DX/dataset/', type=str,
+                        help='Please specify path to the folder with the images.')
+    parser.add_argument('--csv_path', default='/path/to/dataset/csv/', type=str,
+                        help='Please specify path to the DX dataset CSV file.')
     args = parser.parse_args()
 
     utils.init_distributed_mode(args)
