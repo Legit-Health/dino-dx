@@ -21,8 +21,11 @@ import json
 from pathlib import Path
 
 import numpy as np
-from PIL import Image
+from PIL import Image, ImageFile
+ImageFile.LOAD_TRUNCATED_IMAGES = True
+Image.MAX_IMAGE_PIXELS = 100000000000
 import torch
+
 import torch.nn as nn
 import torch.distributed as dist
 import torch.backends.cudnn as cudnn
@@ -31,6 +34,7 @@ from torchvision import datasets, transforms
 from torchvision import models as torchvision_models
 
 import utils
+from dx_utils import DXDataset4DINO
 import vision_transformer as vits
 from vision_transformer import DINOHead
 
@@ -117,8 +121,10 @@ def get_args_parser():
         Used for small local view cropping of multi-crop.""")
 
     # Misc
-    parser.add_argument('--data_path', default='/path/to/imagenet/train/', type=str,
-        help='Please specify path to the ImageNet training data.')
+    parser.add_argument('--data_path', default='/path/to/DX/dataset/', type=str,
+        help='Please specify path to the folder with the images.')
+    parser.add_argument('--csv_path', default='/path/to/dataset/csv/', type=str,
+        help='Please specify path to the DX dataset CSV file.')
     parser.add_argument('--output_dir', default=".", type=str, help='Path to save logs and checkpoints.')
     parser.add_argument('--saveckp_freq', default=20, type=int, help='Save checkpoint every x epochs.')
     parser.add_argument('--seed', default=0, type=int, help='Random seed.')
@@ -142,7 +148,11 @@ def train_dino(args):
         args.local_crops_scale,
         args.local_crops_number,
     )
-    dataset = datasets.ImageFolder(args.data_path, transform=transform)
+
+    # Instead of using the default ImageFolder dataset, we have defined a new Dataset class
+    # dataset = datasets.ImageFolder(args.data_path, transform=transform)
+    dataset = DXDataset4DINO(args.csv_path, args.data_path, transform=transform)
+
     sampler = torch.utils.data.DistributedSampler(dataset, shuffle=True)
     data_loader = torch.utils.data.DataLoader(
         dataset,
